@@ -71,3 +71,14 @@ class MikrotikDevice(NetworkDevice):
     def disconnect(self):
         if self.connection:
             self.connection.disconnect()
+
+
+    # --- FITUR TAMBAHAN: ARP SCANNER ---
+    def get_arp_table(self):
+        if not self.connection: return "Not connected"
+        try:
+            # Mengambil data ARP (IP & MAC Address perangkat yang konek)
+            output = self.connection.send_command("/ip arp print terse")
+            return output
+        except Exception as e:
+            return f"Gagal scan ARP: {e}"

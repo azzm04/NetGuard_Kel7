@@ -2,6 +2,7 @@ import customtkinter as ctk
 import threading
 from backend.mikrotik_device import MikrotikDevice
 
+# --- KONFIGURASI TEMA ---
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
@@ -10,12 +11,12 @@ class NetGuardUI(ctk.CTk):
         super().__init__()
 
         self.title("NetGuard - Router Admin Pro")
-        self.geometry("800x600")
+        self.geometry("800x650") # Sedikit lebih tinggi biar muat
         self.resizable(False, False)
 
         # Layout Utama
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1) # Tab area expand
+        self.grid_rowconfigure(1, weight=1) 
 
         # --- HEADER ---
         self.header_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="#1a1a1a")
@@ -30,7 +31,7 @@ class NetGuardUI(ctk.CTk):
         self.tab_control = self.tabview.add("Interface Control")
         self.tab_tools = self.tabview.add("Tools & Backup")
 
-        # ================= TAB 1: CONNECTION =================
+        # ================= TAB 1: CONNECTION & MONITORING =================
         self.create_connection_tab()
 
         # ================= TAB 2: INTERFACE CONTROL =================
@@ -49,11 +50,12 @@ class NetGuardUI(ctk.CTk):
     # --- UI BUILDER METHODS ---
     def create_connection_tab(self):
         frame = ctk.CTkFrame(self.tab_connect, fg_color="transparent")
-        frame.pack(pady=20)
+        frame.pack(pady=10)
 
+        # INPUT FORM
         self.ip_entry = ctk.CTkEntry(frame, width=250, placeholder_text="IP Address")
         self.ip_entry.pack(pady=5)
-        self.ip_entry.insert(0, "192.168.56.10")
+        self.ip_entry.insert(0, "192.168.56.10") # Default IP VirtualBox
 
         self.user_entry = ctk.CTkEntry(frame, width=250, placeholder_text="Username")
         self.user_entry.pack(pady=5)
@@ -61,16 +63,31 @@ class NetGuardUI(ctk.CTk):
 
         self.pass_entry = ctk.CTkEntry(frame, width=250, placeholder_text="Password", show="*")
         self.pass_entry.pack(pady=5)
-        self.pass_entry.insert(0, "admin") # Sesuaikan pass router kamu (kosongkan stringnya jika tanpa pass)
+        self.pass_entry.insert(0, "admin") 
 
+        # CONNECT BUTTON
         self.btn_connect = ctk.CTkButton(frame, text="CONNECT TO ROUTER", command=self.start_connection, width=250)
-        self.btn_connect.pack(pady=15)
+        self.btn_connect.pack(pady=10)
 
         self.lbl_status = ctk.CTkLabel(frame, text="Status: Disconnected", text_color="red")
         self.lbl_status.pack()
 
+        # --- BAGIAN BARU: NETWORK MONITOR (ARP) ---
+        ctk.CTkLabel(frame, text="--------------------------------").pack(pady=5)
+        ctk.CTkLabel(frame, text="Network Monitoring:", font=("Roboto", 12, "bold")).pack(pady=2)
+
+        self.btn_scan = ctk.CTkButton(
+            frame, 
+            text="SCAN CONNECTED DEVICES (ARP) 📡", 
+            command=self.scan_devices, 
+            width=250,
+            fg_color="#00695c", # Hijau Tosca
+            hover_color="#004d40",
+            state="disabled" # Mati default-nya
+        )
+        self.btn_scan.pack(pady=5)
+
     def create_control_tab(self):
-        # Penjelasan: Matikan Ether1 (Biasanya internet)
         ctk.CTkLabel(self.tab_control, text="Interface Management (Port Control)", font=("Roboto", 16)).pack(pady=10)
         
         btn_frame = ctk.CTkFrame(self.tab_control)
@@ -124,6 +141,9 @@ class NetGuardUI(ctk.CTk):
             self.lbl_status.configure(text="Status: CONNECTED", text_color="#00ff00")
             self.btn_connect.configure(text="CONNECTED", fg_color="green")
             
+            # --- NYALAKAN TOMBOL SCAN ---
+            self.btn_scan.configure(state="normal")
+
             # Auto fetch info
             info = self.device.execute_command("/system resource print")
             self.log(info)
@@ -131,7 +151,24 @@ class NetGuardUI(ctk.CTk):
             self.log(f"GAGAL: {msg}")
             self.lbl_status.configure(text="Status: Error Connection", text_color="red")
             self.btn_connect.configure(state="normal", text="CONNECT TO ROUTER")
+            self.btn_scan.configure(state="disabled")
 
+    # --- FITUR SCAN DEVICES (ARP) ---
+    def scan_devices(self):
+        if not self.device: return
+        
+        def run_scan():
+            self.log("Scanning jaringan (Membaca ARP Table)...")
+            # Pastikan backend memiliki method get_arp_table
+            result = self.device.get_arp_table()
+            
+            self.log("\n--- [HASIL SCAN PERANGKAT] ---")
+            self.log(result)
+            self.log("------------------------------")
+            
+        threading.Thread(target=run_scan).start()
+
+    # --- OTHER FEATURES ---
     def toggle_interface(self, iface, state):
         if not self.device: return
         threading.Thread(target=lambda: self.log(self.device.set_interface_state(iface, state))).start()
@@ -153,6 +190,8 @@ class NetGuardUI(ctk.CTk):
             self.device.execute_command("/system reboot\ny")
             self.log("Koneksi putus. Silakan restart aplikasi jika router sudah nyala.")
             self.device.disconnect()
+            self.btn_scan.configure(state="disabled")
+            self.btn_connect.configure(state="normal", text="CONNECT TO ROUTER")
         threading.Thread(target=run).start()
 
 if __name__ == "__main__":
