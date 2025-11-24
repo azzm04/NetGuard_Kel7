@@ -30,6 +30,7 @@ class NetGuardUI(ctk.CTk):
         self.tab_connect = self.tabview.add("Connection")
         self.tab_control = self.tabview.add("Interface Control")
         self.tab_tools = self.tabview.add("Tools & Backup")
+        self.tab_terminal = self.tabview.add("Terminal / CLI")
 
         # ================= TAB 1: CONNECTION & MONITORING =================
         self.create_connection_tab()
@@ -39,6 +40,8 @@ class NetGuardUI(ctk.CTk):
 
         # ================= TAB 3: TOOLS =================
         self.create_tools_tab()
+
+        self.create_terminal_tab()
 
         # --- LOG AREA (BAWAH) ---
         ctk.CTkLabel(self, text="System Logs:", anchor="w").grid(row=2, column=0, sticky="w", padx=25)
@@ -101,6 +104,35 @@ class NetGuardUI(ctk.CTk):
         self.btn_enable_eth1 = ctk.CTkButton(btn_frame, text="HIDUPKAN PORT (Enable)", fg_color="#388e3c", command=lambda: self.toggle_interface("ether1", "no"))
         self.btn_enable_eth1.pack(pady=5)
 
+    def create_terminal_tab(self):
+        # Penjelasan
+        ctk.CTkLabel(self.tab_terminal, text="Ketik perintah CLI Mikrotik di bawah:", font=("Roboto", 12)).pack(pady=5)
+        
+        # Input Box untuk perintah (misal: /ip address print)
+        self.cmd_entry = ctk.CTkEntry(self.tab_terminal, width=600, placeholder_text="Contoh: /ip address print")
+        self.cmd_entry.pack(pady=10)
+        
+        # Tombol Kirim
+        self.btn_send_cmd = ctk.CTkButton(self.tab_terminal, text="KIRIM PERINTAH", command=self.run_custom_command, fg_color="#4a148c")
+        self.btn_send_cmd.pack(pady=5)
+        
+        # Tips
+        ctk.CTkLabel(self.tab_terminal, text="*Hasil akan muncul di System Logs di bawah", text_color="gray", font=("Arial", 10)).pack(pady=20)
+
+    def run_custom_command(self):
+        command = self.cmd_entry.get()
+        if not command or not self.device: 
+            self.log("Error: Koneksi belum ada atau perintah kosong.")
+            return
+
+        def task():
+            self.log(f"Mengirim: {command}")
+            # Memanggil fungsi execute_command yang sudah ada di backend
+            result = self.device.execute_command(command)
+            self.log(f"--- OUTPUT ---\n{result}\n----------------")
+
+        threading.Thread(target=task).start()
+    
     def create_tools_tab(self):
         # Identity
         ctk.CTkLabel(self.tab_tools, text="Router Identity", font=("Roboto", 14)).pack(pady=5)
